@@ -1,0 +1,158 @@
+/* Add to existing App.css */
+
+/* Loading container */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  gap: 1rem;
+}
+
+/* Dashboard styles */
+.dashboard-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.welcome-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.welcome-card h2 {
+  color: #27ae60;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.user-info {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+  border-left: 4px solid #3498db;
+}
+
+.user-info h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.user-info p {
+  margin: 0.5rem 0;
+  color: #7f8c8d;
+}
+
+.status-active {
+  color: #27ae60;
+  font-weight: bold;
+}
+
+.next-module {
+  background: #e8f4fd;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #b3d9ff;
+}
+
+.next-module h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.feature-preview {
+  margin-top: 1rem;
+}
+
+.feature-preview h4 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.feature-preview ul {
+  list-style: none;
+  padding: 0;
+}
+
+.feature-preview li {
+  padding: 0.25rem 0;
+  color: #27ae60;
+}
+
+.feature-preview li:before {
+  content: "🔄 ";
+}
+
+/* Auth action buttons */
+.auth-action-button {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 0 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.auth-action-button:hover {
+  background: linear-gradient(135deg, #2980b9, #2471a3);
+  transform: translateY(-1px);
+}
+
+.auth-action-button.secondary {
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+}
+
+.auth-action-button.secondary:hover {
+  background: linear-gradient(135deg, #7f8c8d, #717d7e);
+}
+
+/* Logout button */
+.logout-button {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.3s ease;
+}
+
+.logout-button:hover {
+  background: #c0392b;
+}
+
+/* Module features list */
+.module-features {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 5px;
+  margin-top: 1rem;
+}
+
+.module-features h4 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.module-features ul {
+  list-style: none;
+  padding: 0;
+}
+
+.module-features li {
+  padding: 0.25rem 0;
+  color: #27ae60;
+}
+
+.module-features li:before {
+  content: "✅ ";
+}
