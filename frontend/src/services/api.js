@@ -53,4 +53,13 @@ export const usersAPI = {
   searchUsers: (username) => api.get(`/users/search/${username}`),
 };
 
+// Key Exchange API calls (ADD THIS)
+export const keyExchangeAPI = {
+  initiate: (data) => api.post('/keys/exchange/initiate', data),
+  respond: (data) => api.post('/keys/exchange/respond', data),
+  confirm: (data) => api.post('/keys/exchange/confirm', data),
+  getStatus: (sessionId) => api.get(`/keys/exchange/status/${sessionId}`),
+  getSession: (sessionId) => api.get(`/keys/exchange/session/${sessionId}`),
+  getPending: () => api.get('/keys/exchange/pending'),
+};
 export default api;

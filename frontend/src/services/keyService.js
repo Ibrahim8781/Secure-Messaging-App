@@ -7,6 +7,10 @@ class KeyService {
     this.keyGenerationInProgress = false;
   }
 
+  // ============================================================
+  // ========== ENCRYPTION KEYS (YOUR ORIGINAL VERSION) ==========
+  // ============================================================
+
   // Generate and store keys for user
   async generateAndStoreKeys(userId) {
     if (this.keyGenerationInProgress) {
@@ -180,6 +184,124 @@ class KeyService {
       };
     } catch (error) {
       console.error('Failed to get key stats:', error);
+      throw error;
+    }
+  }
+
+  // ============================================================
+  // ========== SIGNING KEYS (PEER'S NEW ADDITIONS) =============
+  // ============================================================
+
+  // Generate and store RSA-PSS signing keys
+  async generateAndStoreSigningKeys(userId) {
+    if (this.keyGenerationInProgress) {
+      throw new Error('Key generation already in progress');
+    }
+
+    this.keyGenerationInProgress = true;
+
+    try {
+      console.log('🚀 Starting signing key generation...');
+
+      // Step 1: Generate RSA-PSS signing key pair
+      console.log('🔐 Generating RSA-PSS key pair...');
+      const signingKeyPair = await cryptoUtils.generateSigningKeyPair();
+
+      // Step 2: Export keys
+      console.log('📤 Exporting signing keys...');
+      const signingPublicKeyBase64 = await cryptoUtils.exportSigningPublicKey(signingKeyPair.publicKey);
+      const signingPrivateKeyBase64 = await cryptoUtils.exportSigningPrivateKey(signingKeyPair.privateKey);
+
+      // Step 3: Store private signing key locally in IndexedDB
+      console.log('💾Storing signing private key locally...');
+      await indexedDBManager.storePrivateKey(
+        userId,
+        signingPrivateKeyBase64,
+        {
+          algorithm: 'RSA-PSS',
+          modulusLength: 2048,
+          hash: 'SHA-256'
+        },
+        'signing' // Key type identifier
+      );
+
+      // Step 4: Upload public signing key to server
+      console.log('📡 Uploading signing public key to server...');
+      await usersAPI.updatePublicKey({
+        signingPublicKey: signingPublicKeyBase64,
+        signingKeyInfo: {
+          algorithm: 'RSA-PSS',
+          modulusLength: 2048,
+          hash: 'SHA-256',
+          publicExponent: [1, 0, 1],
+          keyUsages: ['verify']
+        }
+      });
+
+      console.log('✅ Signing key generation completed successfully');
+
+      return {
+        success: true,
+        publicKey: signingPublicKeyBase64
+      };
+
+    } catch (error) {
+      console.error('❌ Signing key generation failed:', error);
+      throw error;
+    } finally {
+      this.keyGenerationInProgress = false;
+    }
+  }
+
+  // Get user's signing private key
+  async getSigningPrivateKey(userId) {
+    try {
+      const keyRecord = await indexedDBManager.getPrivateKey(userId, 'signing');
+
+      if (!keyRecord) {
+        return null;
+      }
+
+      // Import the signing private key for use
+      const signingPrivateKey = await cryptoUtils.importSigningPrivateKey(keyRecord.keyData);
+
+      return {
+        cryptoKey: signingPrivateKey,
+        keyRecord: keyRecord
+      };
+    } catch (error) {
+      console.error('Failed to get signing private key:', error);
+      throw error;
+    }
+  }
+
+  // Check if user has signing keys
+  async hasSigningKeys(userId) {
+    try {
+      const hasPrivateKey = await indexedDBManager.hasPrivateKey(userId, 'signing');
+      return hasPrivateKey;
+    } catch (error) {
+      console.error('Failed to check signing key status:', error);
+      return false;
+    }
+  }
+
+  // Get signing public key for another user from server
+  async getSigningPublicKeyForUser(userId) {
+    try {
+      const response = await usersAPI.getPublicKey(userId);
+
+      if (response.data.signingPublicKey) {
+        const publicKey = await cryptoUtils.importSigningPublicKey(response.data.signingPublicKey);
+        return {
+          cryptoKey: publicKey,
+          keyInfo: response.data.signingKeyInfo
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to get signing public key for user:', error);
       throw error;
     }
   }

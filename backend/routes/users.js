@@ -19,6 +19,11 @@ router.get('/:userId/public-key', authMiddleware, async (req, res) => {
       username: user.username,
       publicKey: user.publicKey,
       keyInfo: user.keyInfo,
+
+      // NEW: Include signing public key if available
+      signingPublicKey: user.signingPublicKey,
+      signingKeyInfo: user.signingKeyInfo,
+
       code: 'PUBLIC_KEY_RETRIEVED'
     });
   } catch (error) {
@@ -33,9 +38,9 @@ router.get('/:userId/public-key', authMiddleware, async (req, res) => {
 // Update user public key (for key generation in next module)
 router.put('/public-key', authMiddleware, async (req, res) => {
   try {
-    const { publicKey, keyInfo } = req.body;
+    const { publicKey, keyInfo, signingPublicKey, signingKeyInfo } = req.body;
 
-    if (!publicKey) {
+    if (!publicKey && !signingPublicKey) {
       return res.status(400).json({ 
         error: 'Public key is required',
         code: 'MISSING_PUBLIC_KEY'
@@ -43,15 +48,27 @@ router.put('/public-key', authMiddleware, async (req, res) => {
     }
 
     const user = await User.findById(req.user._id);
-    user.publicKey = publicKey;
-    if (keyInfo) {
-      user.keyInfo = { ...user.keyInfo, ...keyInfo };
+
+    // --- EXISTING: Update encryption public key ---
+    if (publicKey) {
+      user.publicKey = publicKey;
+      if (keyInfo) {
+        user.keyInfo = { ...user.keyInfo, ...keyInfo };
+      }
+    }
+
+    // --- NEW: Update signing public key ---
+    if (signingPublicKey) {
+      user.signingPublicKey = signingPublicKey;
+      if (signingKeyInfo) {
+        user.signingKeyInfo = { ...user.signingKeyInfo, ...signingKeyInfo };
+      }
     }
     
     await user.save();
 
     res.json({
-      message: 'Public key updated successfully',
+      message: 'Public key(s) updated successfully',
       code: 'PUBLIC_KEY_UPDATED'
     });
   } catch (error) {
@@ -78,7 +95,7 @@ router.get('/search/:username', authMiddleware, async (req, res) => {
     const users = await User.find({
       username: { $regex: username, $options: 'i' },
       _id: { $ne: req.user._id } // Exclude current user
-    }).select('username publicKey keyInfo');
+    }).select('username publicKey keyInfo signingPublicKey signingKeyInfo');
 
     res.json({
       users,
