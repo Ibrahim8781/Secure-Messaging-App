@@ -7,278 +7,177 @@ class IndexedDBManager {
     this.db = null;
   }
 
-  // Initialize database connection
   async init() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.dbVersion);
-
-      request.onerror = () => {
-        reject(new Error(`IndexedDB error: ${request.error}`));
-      };
-
+      request.onerror = () => reject(new Error(`IndexedDB error: ${request.error}`));
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('✅ IndexedDB connection established');
         resolve(this.db);
       };
-
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
-        
         if (!db.objectStoreNames.contains(this.storeName)) {
           const store = db.createObjectStore(this.storeName, { keyPath: 'id' });
           store.createIndex('userId', 'userId', { unique: false });
           store.createIndex('keyType', 'keyType', { unique: false });
-          console.log('✅ IndexedDB store created');
         }
       };
     });
   }
 
-  // Store private key securely
   async storePrivateKey(userId, privateKeyData, keyInfo = {}, keyType = 'encryption') {
-    try {
-      if (!this.db) await this.init();
-
-      const transaction = this.db.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-
-      const keyRecord = {
-        id: `${keyType}_${userId}`,
-        userId: userId,
-        keyType: keyType,
-        keyData: privateKeyData,
-        keyInfo: {
-          algorithm: keyInfo.algorithm || (keyType === 'encryption' ? 'RSA-OAEP' : 'RSA-PSS'),
-          modulusLength: keyInfo.modulusLength || 2048,
-          hash: keyInfo.hash || 'SHA-256',
-          generatedAt: new Date().toISOString()
-        },
-        createdAt: new Date().toISOString(),
-        lastAccessed: new Date().toISOString()
-      };
-
-      await store.put(keyRecord);
-      console.log(`✅ ${keyType} private key stored securely in IndexedDB`);
-      return true;
-    } catch (error) {
-      console.error(`❌ Failed to store ${keyType} private key:`, error);
-      throw error;
-    }
+    if (!this.db) await this.init();
+    const transaction = this.db.transaction([this.storeName], 'readwrite');
+    const store = transaction.objectStore(this.storeName);
+    const keyRecord = {
+      id: `${keyType}_${userId}`,
+      userId: userId,
+      keyType: keyType,
+      keyData: privateKeyData,
+      keyInfo: {
+        algorithm: keyInfo.algorithm || (keyType === 'encryption' ? 'RSA-OAEP' : 'RSA-PSS'),
+        modulusLength: keyInfo.modulusLength || 2048,
+        hash: keyInfo.hash || 'SHA-256',
+        generatedAt: new Date().toISOString()
+      },
+      createdAt: new Date().toISOString(),
+      lastAccessed: new Date().toISOString()
+    };
+    return new Promise((resolve, reject) => {
+      const req = store.put(keyRecord);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
   }
 
-  // Retrieve private key
   async getPrivateKey(userId, keyType = 'encryption') {
-    try {
-      if (!this.db) await this.init();
-
-      const transaction = this.db.transaction([this.storeName], 'readonly');
-      const store = transaction.objectStore(this.storeName);
-      
-      return new Promise((resolve, reject) => {
-        const request = store.get(`${keyType}_${userId}`);
-        
-        request.onsuccess = () => {
-          if (request.result) {
-            this.updateLastAccessed(`${keyType}_${userId}`);
-            console.log(`✅ ${keyType} private key retrieved from IndexedDB`);
-            resolve(request.result);
-          } else {
-            resolve(null);
-          }
-        };
-        
-        request.onerror = () => {
-          reject(new Error(`Failed to retrieve ${keyType} private key`));
-        };
-      });
-    } catch (error) {
-      console.error(`❌ Failed to retrieve ${keyType} private key:`, error);
-      throw error;
-    }
+    if (!this.db) await this.init();
+    const transaction = this.db.transaction([this.storeName], 'readonly');
+    const store = transaction.objectStore(this.storeName);
+    return new Promise((resolve, reject) => {
+      const request = store.get(`${keyType}_${userId}`);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(new Error(`Failed to retrieve ${keyType} private key`));
+    });
   }
 
-  // Store session keys
   async storeSessionKey(userId, sessionId, keyData, keyInfo = {}) {
-    try {
-      if (!this.db) await this.init();
-
-      const transaction = this.db.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-
-      const keyRecord = {
-        id: `session_${userId}_${sessionId}`,
-        userId: userId,
-        sessionId: sessionId,
-        keyType: 'session',
-        keyData: keyData,
-        keyInfo: keyInfo,
-        createdAt: new Date().toISOString(),
-        lastAccessed: new Date().toISOString()
-      };
-
-      await store.put(keyRecord);
-      console.log('✅ Session key stored in IndexedDB');
-      return true;
-    } catch (error) {
-      console.error('❌ Failed to store session key:', error);
-      throw error;
-    }
+    if (!this.db) await this.init();
+    const transaction = this.db.transaction([this.storeName], 'readwrite');
+    const store = transaction.objectStore(this.storeName);
+    const keyRecord = {
+      id: `session_${userId}_${sessionId}`,
+      userId: userId,
+      sessionId: sessionId,
+      keyType: 'session',
+      keyData: keyData,
+      keyInfo: keyInfo,
+      sequenceNumber: 0, // Module 7: Initialize sequence
+      createdAt: new Date().toISOString(),
+      lastAccessed: new Date().toISOString()
+    };
+    return new Promise((resolve, reject) => {
+      const req = store.put(keyRecord);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
   }
 
-  // Retrieve session key
   async getSessionKey(userId, sessionId) {
-    try {
-      if (!this.db) await this.init();
-
-      const transaction = this.db.transaction([this.storeName], 'readonly');
-      const store = transaction.objectStore(this.storeName);
-      
-      return new Promise((resolve, reject) => {
-        const request = store.get(`session_${userId}_${sessionId}`);
-        
-        request.onsuccess = () => {
-          if (request.result) {
-            this.updateLastAccessed(`session_${userId}_${sessionId}`);
-            resolve(request.result);
-          } else {
-            resolve(null);
-          }
-        };
-        
-        request.onerror = () => {
-          reject(new Error('Failed to retrieve session key'));
-        };
-      });
-    } catch (error) {
-      console.error('❌ Failed to retrieve session key:', error);
-      throw error;
-    }
+    if (!this.db) await this.init();
+    const transaction = this.db.transaction([this.storeName], 'readonly');
+    const store = transaction.objectStore(this.storeName);
+    return new Promise((resolve, reject) => {
+      const request = store.get(`session_${userId}_${sessionId}`);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(new Error('Failed to retrieve session key'));
+    });
   }
 
-  // Update last accessed time
-  async updateLastAccessed(keyId) {
-    try {
-      if (!this.db) await this.init();
+  // ✅ Module 7: Increment and Get Sequence Number
+  async getNextSequenceNumber(userId, sessionId) {
+    if (!this.db) await this.init();
+    const transaction = this.db.transaction([this.storeName], 'readwrite');
+    const store = transaction.objectStore(this.storeName);
+    const id = `session_${userId}_${sessionId}`;
 
-      const transaction = this.db.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-
-      const request = store.get(keyId);
+    return new Promise((resolve, reject) => {
+      const request = store.get(id);
       request.onsuccess = () => {
         const record = request.result;
         if (record) {
+          const nextSeq = (record.sequenceNumber || 0) + 1;
+          record.sequenceNumber = nextSeq;
           record.lastAccessed = new Date().toISOString();
-          store.put(record);
+          const updateRequest = store.put(record);
+          updateRequest.onsuccess = () => resolve(nextSeq);
+          updateRequest.onerror = () => reject(new Error('Failed to update sequence number'));
+        } else {
+          reject(new Error('Session not found for sequencing'));
         }
       };
-    } catch (error) {
-      console.error('Failed to update last accessed time:', error);
-    }
+      request.onerror = () => reject(new Error('Failed to access session for sequencing'));
+    });
   }
 
-  // Check if private key exists for user
   async hasPrivateKey(userId, keyType = 'encryption') {
-    try {
-      const key = await this.getPrivateKey(userId, keyType);
-      return key !== null;
-    } catch (error) {
-      console.error(`Failed to check ${keyType} private key existence:`, error);
-      return false;
-    }
+    const key = await this.getPrivateKey(userId, keyType);
+    return key !== null;
   }
 
-  // Get all keys for a user
   async getUserKeys(userId) {
-    try {
-      if (!this.db) await this.init();
-
-      const transaction = this.db.transaction([this.storeName], 'readonly');
-      const store = transaction.objectStore(this.storeName);
-      const index = store.index('userId');
-      
-      return new Promise((resolve, reject) => {
-        const request = index.getAll(userId);
-        
-        request.onsuccess = () => {
-          resolve(request.result);
-        };
-        
-        request.onerror = () => {
-          reject(new Error('Failed to retrieve user keys'));
-        };
-      });
-    } catch (error) {
-      console.error('❌ Failed to retrieve user keys:', error);
-      throw error;
-    }
+    if (!this.db) await this.init();
+    const transaction = this.db.transaction([this.storeName], 'readonly');
+    const store = transaction.objectStore(this.storeName);
+    const index = store.index('userId');
+    return new Promise((resolve, reject) => {
+      const request = index.getAll(userId);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(new Error('Failed to retrieve user keys'));
+    });
   }
 
-  // Delete specific key
   async deleteKey(keyId) {
-    try {
-      if (!this.db) await this.init();
-
-      const transaction = this.db.transaction([this.storeName], 'readwrite');
-      const store = transaction.objectStore(this.storeName);
-      
-      return new Promise((resolve, reject) => {
-        const request = store.delete(keyId);
-        
-        request.onsuccess = () => {
-          console.log(`✅ Key ${keyId} deleted from IndexedDB`);
-          resolve(true);
-        };
-        
-        request.onerror = () => {
-          console.error(`❌ Failed to delete key ${keyId}:`, request.error);
-          reject(new Error(`Failed to delete key: ${request.error.name}`));
-        };
-      });
-
-    } catch (error) {
-      console.error('❌ Failed to delete key:', error);
-      throw error;
-    }
+    if (!this.db) await this.init();
+    const transaction = this.db.transaction([this.storeName], 'readwrite');
+    const store = transaction.objectStore(this.storeName);
+    return new Promise((resolve, reject) => {
+      const request = store.delete(keyId);
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(new Error(`Failed to delete key`));
+    });
   }
 
-  // ✅ FIXED: Clear all keys for user with optional type filtering
-  /**
-   * Clear user keys from IndexedDB
-   * @param {string} userId - User ID
-   * @param {string} [keyType] - Optional: specific key type to delete ('encryption', 'signing', 'session')
-   *                             If omitted, deletes ALL keys for the user
-   * @returns {Promise<boolean>}
-   * 
-   * Examples:
-   * - clearUserKeys(userId) → Deletes ALL keys for user
-   * - clearUserKeys(userId, 'encryption') → Deletes only encryption keys
-   * - clearUserKeys(userId, 'signing') → Deletes only signing keys
-   */
   async clearUserKeys(userId, keyType = null) {
     try {
       const userKeys = await this.getUserKeys(userId);
-      
-      let deletedCount = 0;
       for (const key of userKeys) {
-        // If keyType is specified, only delete that type
-        // If keyType is null, delete all keys
         if (keyType === null || key.keyType === keyType) {
           await this.deleteKey(key.id);
-          deletedCount++;
         }
       }
-      
-      const typeDesc = keyType ? `${keyType} ` : '';
-      console.log(`✅ Cleared ${deletedCount} ${typeDesc}key(s) for user ${userId}`);
       return true;
     } catch (error) {
       console.error('❌ Failed to clear user keys:', error);
       throw error;
     }
   }
+
+  updateLastAccessed(keyId) {
+    // Optimization: fire and forget, don't await
+    if (!this.db) return;
+    const transaction = this.db.transaction([this.storeName], 'readwrite');
+    const store = transaction.objectStore(this.storeName);
+    const request = store.get(keyId);
+    request.onsuccess = () => {
+      if (request.result) {
+        request.result.lastAccessed = new Date().toISOString();
+        store.put(request.result);
+      }
+    };
+  }
 }
 
-// Create singleton instance
 const indexedDBManager = new IndexedDBManager();
 export default indexedDBManager;
