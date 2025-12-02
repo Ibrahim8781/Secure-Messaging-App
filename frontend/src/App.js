@@ -3,27 +3,23 @@ import axios from 'axios';
 import Login from './components/login';
 import Register from './components/register';
 import KeyManager from './components/KeyManager';
+import KeyExchange from './components/KeyExchange';
+import Chat from './components/Chat';
 import { authService } from './services/auth';
 import { authAPI } from './services/api';
-
-// ### 11. Add KeyExchange to App
-// Import KeyExchange component as suggested by peer
-import KeyExchange from './components/KeyExchange';
-
 import './App.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 function App() {
   const [serverStatus, setServerStatus] = useState('checking');
-  const [cryptoSupport, setCryptoSupport] = useState({ webCrypto: false, indexedDB: false });
-const [currentView, setCurrentView] = useState('login'); // instead of 'status'
+  const [currentView, setCurrentView] = useState('login');
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [chatContext, setChatContext] = useState(null);
 
   useEffect(() => {
     checkServerHealth();
-    checkCryptoSupport();
     checkAuthentication();
   }, []);
 
@@ -39,22 +35,6 @@ const [currentView, setCurrentView] = useState('login'); // instead of 'status'
       console.error('Server health check failed:', error);
       setServerStatus('error');
     }
-  };
-
-  const checkCryptoSupport = () => {
-    const webCryptoSupported =
-      typeof window !== 'undefined' &&
-      (window.crypto || window.msCrypto) &&
-      window.crypto.subtle;
-
-    const indexedDBSupported =
-      typeof window !== 'undefined' &&
-      ('indexedDB' in window);
-
-    setCryptoSupport({
-      webCrypto: !!webCryptoSupported,
-      indexedDB: !!indexedDBSupported
-    });
   };
 
   const checkAuthentication = async () => {
@@ -89,13 +69,10 @@ const [currentView, setCurrentView] = useState('login'); // instead of 'status'
     setCurrentView('login');
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'connected': return '#28a745';
-      case 'checking': return '#ffc107';
-      case 'error': return '#dc3545';
-      default: return '#6c757d';
-    }
+  const openChat = (recipientId, sessionId) => {
+    console.log('✅ Opening chat:', { recipientId, sessionId });
+    setChatContext({ recipientId, sessionId });
+    setCurrentView('chat');
   };
 
   if (!authChecked) {
@@ -127,6 +104,26 @@ const [currentView, setCurrentView] = useState('login'); // instead of 'status'
     );
   }
 
+  if (currentView === 'chat' && chatContext) {
+    return (
+      <Chat
+        recipientId={chatContext.recipientId}
+        sessionId={chatContext.sessionId}
+        onBack={() => setCurrentView('dashboard')}
+      />
+    );
+  }
+
+  if (currentView === 'key-exchange') {
+    return (
+      <KeyExchange
+        user={user}
+        onBack={() => setCurrentView('dashboard')}
+        onStartChat={openChat}  // ✅ Pass the openChat function
+      />
+    );
+  }
+
   if (currentView === 'dashboard' && user) {
     return (
       <div className="App">
@@ -141,8 +138,7 @@ const [currentView, setCurrentView] = useState('login'); // instead of 'status'
         <main className="app-main">
           <div className="dashboard-container">
             <div className="welcome-card">
-              <h2>🎉 Authentication Successful!</h2>
-              <p>Your user account has been created and you're ready to proceed.</p>
+              <h2>🎉 Module 5: End-to-End Encrypted Messaging</h2>
 
               <div className="user-info">
                 <h3>User Information:</h3>
@@ -154,26 +150,16 @@ const [currentView, setCurrentView] = useState('login'); // instead of 'status'
               <KeyManager />
 
               <div className="next-module">
-                <h3>Next Step: Module 4</h3>
-                <p>We'll now implement the custom key exchange protocol for secure communication.</p>
-                <div className="feature-preview">
-                  <h4>Coming in Module 4:</h4>
-                  <ul>
-                    <li>✅ Elliptic Curve Diffie-Hellman (ECDH) key exchange</li>
-                    <li>✅ Digital signatures for authentication</li>
-                    <li>✅ Session key derivation using HKDF</li>
-                    <li>✅ Key confirmation message flow</li>
-                    <li>✅ Complete protocol diagram explanation</li>
-                  </ul>
-                </div>
+                <h3>Ready to Chat!</h3>
+                <p>Complete key exchange with another user, then start secure messaging.</p>
+                <button
+                  onClick={() => setCurrentView('key-exchange')}
+                  className="auth-action-button"
+                  style={{ marginTop: '20px' }}
+                >
+                  🔐 Start Key Exchange
+                </button>
               </div>
-              <button
-                onClick={() => setCurrentView('key-exchange')}
-                className="auth-action-button"
-                style={{ marginTop: '20px' }}
-              >
-                🔐 Open Key Exchange Module
-              </button>
             </div>
           </div>
         </main>
@@ -181,23 +167,7 @@ const [currentView, setCurrentView] = useState('login'); // instead of 'status'
     );
   }
 
-  // ### Peer Suggested Route for KeyExchange
-  if (currentView === 'key-exchange') {
-    return <KeyExchange user={user} onBack={() => setCurrentView('dashboard')} />;
-  }
-
-  return (
-    <div className="App">
-      <header className="app-header">
-        <h1>🔒 Secure Messenger</h1>
-        <p>End-to-End Encrypted Messaging & File Sharing</p>
-      </header>
-
-      <main className="app-main">
-        {/* Rest of status page and features list */}
-      </main>
-    </div>
-  );
+  return null;
 }
 
 export default App;

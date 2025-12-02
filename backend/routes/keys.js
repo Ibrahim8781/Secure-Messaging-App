@@ -366,6 +366,9 @@ router.get('/exchange/session/:sessionId', authMiddleware, async (req, res) => {
         responderEphemeralPublic: session.responderEphemeralPublic,
         initiatorNonce: session.initiatorNonce,
         responderNonce: session.responderNonce,
+        // ✅ ADD THESE TWO LINES:
+        initiatorConfirmation: session.initiatorConfirmation, 
+        responderConfirmation: session.responderConfirmation,
         createdAt: session.createdAt,
         expiresAt: session.expiresAt
       },

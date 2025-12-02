@@ -2,7 +2,7 @@
 class IndexedDBManager {
   constructor() {
     this.dbName = 'SecureMessagingDB';
-    this.dbVersion = 1;
+    this.dbVersion = 2;
     this.storeName = 'keys';
     this.db = null;
   }

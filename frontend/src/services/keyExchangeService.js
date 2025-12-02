@@ -206,6 +206,7 @@ async completeKeyExchange(sessionId, myUserId) {
       sessionId,
       sharedSecret: cryptoUtils.arrayBufferToBase64(sharedSecret)
     });
+    console.log('Shared secret before HMAC:', sharedSecret);
 
     const confirmation = await cryptoUtils.generateHMAC(sharedSecret, confirmationData);
 

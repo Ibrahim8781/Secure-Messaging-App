@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -53,7 +54,7 @@ export const usersAPI = {
   searchUsers: (username) => api.get(`/users/search/${username}`),
 };
 
-// Key Exchange API calls (ADD THIS)
+// Key Exchange API calls
 export const keyExchangeAPI = {
   initiate: (data) => api.post('/keys/exchange/initiate', data),
   respond: (data) => api.post('/keys/exchange/respond', data),
@@ -62,4 +63,18 @@ export const keyExchangeAPI = {
   getSession: (sessionId) => api.get(`/keys/exchange/session/${sessionId}`),
   getPending: () => api.get('/keys/exchange/pending'),
 };
+
+// Messages API calls (NEW)
+export const messagesAPI = {
+  send: (messageData) => api.post('/messages', messageData),
+  getConversation: (userId, options = {}) => {
+    const params = new URLSearchParams();
+    if (options.limit) params.append('limit', options.limit);
+    if (options.before) params.append('before', options.before);
+    return api.get(`/messages/conversation/${userId}?${params.toString()}`);
+  },
+  getConversations: () => api.get('/messages/conversations'),
+  deleteMessage: (messageId) => api.delete(`/messages/${messageId}`),
+};
+
 export default api;

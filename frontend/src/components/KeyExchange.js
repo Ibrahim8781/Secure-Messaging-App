@@ -5,7 +5,7 @@ import { usersAPI, keyExchangeAPI } from '../services/api';
 import { authService } from '../services/auth';
 import './KeyExchange.css';
 
-const KeyExchange = () => {
+const KeyExchange = ({ onStartChat }) => {  // ✅ ADD onStartChat prop here
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -110,39 +110,38 @@ const KeyExchange = () => {
   };
 
   // Respond to key exchange
-const respondToExchange = async (sessionId) => {
-  try {
-    setLoading(true);
-    setError('');
-    setStatus('Step 1: Verifying initiator signature...');
+  const respondToExchange = async (sessionId) => {
+    try {
+      setLoading(true);
+      setError('');
+      setStatus('Step 1: Verifying initiator signature...');
 
-    const result = await keyExchangeService.respondToKeyExchange(sessionId, currentUser.id);
-    
-    setActiveExchange({
-      sessionId: sessionId,
-      stage: 'responded',
-      sessionKey: result.sessionKey
-    });
-    
-    setStatus('✅ Response sent! Exchange will complete when initiator confirms. You can close this page.');
-    
-    // Remove from pending
-    setPendingExchanges(pending => pending.filter(ex => ex.sessionId !== sessionId));
-    
-    // Add to completed (since our part is done)
-    setCompletedExchanges(prev => [...prev, {
-      sessionId,
-      completedAt: new Date().toISOString()
-    }]);
-    
-  } catch (error) {
-    console.error('Key exchange response failed:', error);
-    setError('Response failed: ' + error.message);
-    setStatus('');
-  } finally {
-    setLoading(false);
-  }
-};
+      const result = await keyExchangeService.respondToKeyExchange(sessionId, currentUser.id);
+
+      setActiveExchange({
+        sessionId: sessionId,
+        stage: 'responded',
+        sessionKey: result.sessionKey,
+        initiatorId: result.sessionData.initiatorId  // ✅ Store initiator ID
+      });
+
+      setStatus('✅ Response sent! Waiting for initiator to complete...');
+
+      // Remove from pending
+      setPendingExchanges(pending => pending.filter(ex => ex.sessionId !== sessionId));
+
+      // Start polling for completion
+      pollForCompletion(sessionId);
+
+    } catch (error) {
+      console.error('Key exchange response failed:', error);
+      setError('Response failed: ' + error.message);
+      setStatus('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Complete exchange (initiator)
   const completeExchange = async (sessionId) => {
     try {
@@ -152,11 +151,12 @@ const respondToExchange = async (sessionId) => {
 
       const result = await keyExchangeService.completeKeyExchange(sessionId, currentUser.id);
 
-      setActiveExchange({
+      setActiveExchange(prev => ({
+        ...prev,
         sessionId: sessionId,
         stage: 'completed',
         sessionKey: result.sessionKey
-      });
+      }));
 
       setStatus('✅ Key exchange completed! Secure session established.');
 
@@ -210,58 +210,53 @@ const respondToExchange = async (sessionId) => {
     poll();
   };
 
-  // Poll completion (responder)
-// Poll for completion (responder side)
-const pollForCompletion = async (sessionId) => {
-  const maxAttempts = 40; // 2 minutes
-  let attempts = 0;
+  // Poll for completion (responder side)
+  const pollForCompletion = async (sessionId) => {
+    const maxAttempts = 40;
+    let attempts = 0;
 
-  const poll = async () => {
-    if (attempts >= maxAttempts) {
-      setStatus('⚠️ Completion timeout.');
-      return;
-    }
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setStatus('⚠️ Completion timeout.');
+        return;
+      }
 
-    try {
-      const response = await keyExchangeAPI.getStatus(sessionId);
-      console.log('Responder polling status:', response.data.status);
-      
-      // Check if initiator has sent confirmation
-      if (response.data.status === 'confirmed' || response.data.status === 'completed') {
-        // Wait a bit to ensure confirmation is in DB
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        try {
-          await keyExchangeService.verifyKeyConfirmation(sessionId, currentUser.id);
-          setActiveExchange(prev => ({ ...prev, stage: 'completed' }));
-          setStatus('✅ Key exchange completed successfully!');
-          
-          setCompletedExchanges(prev => [...prev, {
-            sessionId,
-            completedAt: new Date().toISOString()
-          }]);
-          
-          return; // Exit polling
-        } catch (verifyError) {
-          console.log('Confirmation not ready yet, continuing to poll...', verifyError.message);
-          // If confirmation not ready, continue polling
+      try {
+        const response = await keyExchangeAPI.getStatus(sessionId);
+        console.log('Responder polling status:', response.data.status);
+
+        if (response.data.status === 'confirmed' || response.data.status === 'completed') {
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          try {
+            await keyExchangeService.verifyKeyConfirmation(sessionId, currentUser.id);
+            setActiveExchange(prev => ({ ...prev, stage: 'completed' }));
+            setStatus('✅ Key exchange completed successfully!');
+
+            setCompletedExchanges(prev => [...prev, {
+              sessionId,
+              completedAt: new Date().toISOString()
+            }]);
+
+            return;
+          } catch (verifyError) {
+            console.log('Confirmation not ready yet, continuing to poll...', verifyError.message);
+            attempts++;
+            setTimeout(poll, 3000);
+          }
+        } else {
           attempts++;
           setTimeout(poll, 3000);
         }
-      } else {
+      } catch (error) {
+        console.error('Polling error:', error);
         attempts++;
         setTimeout(poll, 3000);
       }
-    } catch (error) {
-      console.error('Polling error:', error);
-      attempts++;
-      setTimeout(poll, 3000);
-    }
-  };
+    };
 
-  // Wait 2 seconds before starting to poll (give initiator time to complete)
-  setTimeout(poll, 2000);
-};
+    setTimeout(poll, 2000);
+  };
 
   // Init
   useEffect(() => {
@@ -396,6 +391,21 @@ const pollForCompletion = async (sessionId) => {
                 <p>Secure session established using AES-256-GCM.</p>
                 <p><strong>Session Key:</strong> Derived via HKDF</p>
                 <p><strong>Ready for:</strong> End-to-end encrypted messaging</p>
+
+                {onStartChat && (
+                  <button
+                    onClick={() => {
+                      // ✅ FIX: Get the correct other user ID
+                      const otherUserId = activeExchange.responderId || activeExchange.initiatorId;
+                      console.log('Starting chat with:', otherUserId, 'Session:', activeExchange.sessionId);
+                      onStartChat(otherUserId, activeExchange.sessionId);
+                    }}
+                    className="btn btn-success"
+                    style={{ marginTop: '1rem' }}
+                  >
+                    💬 Start Secure Chat
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -434,7 +444,7 @@ const pollForCompletion = async (sessionId) => {
             <strong>Step 2:</strong> Responder verifies signature and responds with their ephemeral key
           </div>
           <div className="step">
-            <strong>Step 3:</strong> Both parties continue to compute shared secret using ECDH
+            <strong>Step 3:</strong> Both parties compute shared secret using ECDH
           </div>
           <div className="step">
             <strong>Step 4:</strong> Session key derived using HKDF with both nonces

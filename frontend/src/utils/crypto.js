@@ -1,3 +1,4 @@
+
 // Web Crypto API utility functions
 class CryptoUtils {
   constructor() {
@@ -14,6 +15,8 @@ class CryptoUtils {
     };
   }
 
+  // ========== EXISTING METHODS FROM MODULES 1-4 ==========
+
   // Generate RSA-2048 key pair
   async generateKeyPair() {
     try {
@@ -26,8 +29,8 @@ class CryptoUtils {
           publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
           hash: { name: 'SHA-256' }
         },
-        true, // extractable
-        ['encrypt', 'decrypt'] // key usages
+        true,
+        ['encrypt', 'decrypt']
       );
 
       console.log('✅ Key pair generated successfully');
@@ -38,7 +41,7 @@ class CryptoUtils {
     }
   }
 
-  // Export public key as Base64 string for storage
+  // Export public key as Base64 string
   async exportPublicKey(publicKey) {
     try {
       const exported = await window.crypto.subtle.exportKey('spki', publicKey);
@@ -50,7 +53,7 @@ class CryptoUtils {
     }
   }
 
-  // Export private key as Base64 string for secure storage
+  // Export private key as Base64 string
   async exportPrivateKey(privateKey) {
     try {
       const exported = await window.crypto.subtle.exportKey('pkcs8', privateKey);
@@ -104,12 +107,12 @@ class CryptoUtils {
     }
   }
 
-  // Generate key fingerprint (SHA-256 hash of public key)
+  // Generate key fingerprint
   async generateKeyFingerprint(publicKey) {
     try {
       const exported = await window.crypto.subtle.exportKey('spki', publicKey);
       const hash = await window.crypto.subtle.digest('SHA-256', exported);
-      const fingerprint = this.arrayBufferToHex(hash).substring(0, 32); // First 16 bytes
+      const fingerprint = this.arrayBufferToHex(hash).substring(0, 32);
       return fingerprint;
     } catch (error) {
       console.error('Fingerprint generation failed:', error);
@@ -117,54 +120,7 @@ class CryptoUtils {
     }
   }
 
-  // Utility: ArrayBuffer to Base64
-  arrayBufferToBase64(buffer) {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
-
-  // Utility: Base64 to ArrayBuffer
-  base64ToArrayBuffer(base64) {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
-  }
-
-  // Utility: ArrayBuffer to Hex string
-  arrayBufferToHex(buffer) {
-    const bytes = new Uint8Array(buffer);
-    return Array.from(bytes)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  // Generate random IV for AES-GCM
-  generateRandomIV() {
-    return window.crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for AES-GCM
-  }
-
-  // Generate random key for symmetric encryption
-  async generateSymmetricKey() {
-    return await window.crypto.subtle.generateKey(
-      {
-        name: 'AES-GCM',
-        length: 256
-      },
-      true,
-      ['encrypt', 'decrypt']
-    );
-  }
-
-  // ============ ADD THESE METHODS TO YOUR EXISTING CryptoUtils CLASS ============
-
-  // Generate ECDH key pair (P-256 curve)
+  // Generate ECDH key pair
   async generateECDHKeyPair() {
     try {
       console.log('🔐 Generating ECDH P-256 key pair...');
@@ -174,7 +130,7 @@ class CryptoUtils {
           name: 'ECDH',
           namedCurve: 'P-256'
         },
-        true, // extractable
+        true,
         ['deriveKey', 'deriveBits']
       );
 
@@ -229,7 +185,7 @@ class CryptoUtils {
           public: publicKey
         },
         privateKey,
-        256 // 256 bits
+        256
       );
 
       console.log('✅ Shared secret computed');
@@ -245,7 +201,6 @@ class CryptoUtils {
     try {
       console.log('🔐 Deriving session key with HKDF...');
 
-      // Import shared secret as key material
       const keyMaterial = await window.crypto.subtle.importKey(
         'raw',
         sharedSecret,
@@ -254,7 +209,6 @@ class CryptoUtils {
         ['deriveKey']
       );
 
-      // Derive AES-GCM key
       const sessionKey = await window.crypto.subtle.deriveKey(
         {
           name: 'HKDF',
@@ -291,7 +245,7 @@ class CryptoUtils {
           publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
           hash: { name: 'SHA-256' }
         },
-        true, // extractable
+        true,
         ['sign', 'verify']
       );
 
@@ -416,7 +370,6 @@ class CryptoUtils {
   // Generate HMAC
   async generateHMAC(sharedSecret, data) {
     try {
-      // Import shared secret as HMAC key
       const key = await window.crypto.subtle.importKey(
         'raw',
         sharedSecret,
@@ -427,7 +380,6 @@ class CryptoUtils {
         false,
         ['sign']
       );
-
       const encoder = new TextEncoder();
       const encodedData = encoder.encode(data);
 
@@ -443,13 +395,11 @@ class CryptoUtils {
       throw error;
     }
   }
-
   // Generate nonce
   generateNonce() {
     const nonce = window.crypto.getRandomValues(new Uint8Array(32));
     return this.arrayBufferToBase64(nonce.buffer);
   }
-
   // Export session key for storage
   async exportSessionKey(sessionKey) {
     try {
@@ -460,7 +410,6 @@ class CryptoUtils {
       throw error;
     }
   }
-
   // Import session key from storage
   async importSessionKey(base64Key) {
     try {
@@ -481,8 +430,101 @@ class CryptoUtils {
       throw error;
     }
   }
-}
+  // ========== NEW MODULE 5 METHODS ==========
+  /**
+  
+  Generate random 12-byte (96-bit) IV for AES-GCM
+  CRITICAL: NEVER reuse an IV with the same key
+  */
+  generateMessageIV() {
+    return window.crypto.getRandomValues(new Uint8Array(12));
+  }
 
+  /**
+  
+  Encrypt message with AES-256-GCM
+  @param {CryptoKey} sessionKey - AES-GCM session key
+  @param {string} plaintext - Message to encrypt
+  @returns {Object} - { ciphertext: ArrayBuffer, iv: Uint8Array }
+  */
+  async encryptMessageWithKey(sessionKey, plaintext) {
+    try {
+      const iv = this.generateMessageIV();
+      const encoder = new TextEncoder();
+      const plaintextBuffer = encoder.encode(plaintext);
+      const ciphertextBuffer = await window.crypto.subtle.encrypt(
+        {
+          name: 'AES-GCM',
+          iv: iv,
+          tagLength: 128 // 128-bit authentication tag
+        },
+        sessionKey,
+        plaintextBuffer
+      );
+      return {
+        ciphertext: ciphertextBuffer,
+        iv: iv
+      };
+    } catch (error) {
+      console.error('Message encryption failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+  
+  Decrypt message with AES-256-GCM
+  @param {CryptoKey} sessionKey - AES-GCM session key
+  @param {ArrayBuffer} ciphertext - Encrypted message
+  @param {Uint8Array} iv - Initialization vector
+  @returns {string} - Decrypted plaintext
+  */
+  async decryptMessageWithKey(sessionKey, ciphertext, iv) {
+    try {
+      const plaintextBuffer = await window.crypto.subtle.decrypt(
+        {
+          name: 'AES-GCM',
+          iv: iv,
+          tagLength: 128
+        },
+        sessionKey,
+        ciphertext
+      );
+      const decoder = new TextDecoder();
+      return decoder.decode(plaintextBuffer);
+    } catch (error) {
+      console.error('Message decryption failed');
+      throw new Error('Decryption failed');
+    }
+  }
+
+  // ========== UTILITY METHODS ==========
+  // ArrayBuffer to Base64
+  arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+  // Base64 to ArrayBuffer
+  base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+  // ArrayBuffer to Hex string
+  arrayBufferToHex(buffer) {
+    const bytes = new Uint8Array(buffer);
+    return Array.from(bytes)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+}
 // Create singleton instance
 const cryptoUtils = new CryptoUtils();
 export default cryptoUtils;
