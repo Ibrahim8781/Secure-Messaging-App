@@ -524,6 +524,75 @@ class CryptoUtils {
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
   }
+
+// 1. Generate File Key (AES-256-GCM)
+  async generateFileKey() {
+    return window.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  }
+
+  // 2. Encrypt Chunk
+  async encryptChunk(fileKey, chunkBuffer) {
+    const iv = this.generateMessageIV();
+    const ct = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, tagLength: 128 },
+      fileKey,
+      chunkBuffer
+    );
+    return { ciphertext: this.arrayBufferToBase64(ct), iv: this.arrayBufferToBase64(iv) };
+  }
+
+  // 3. Decrypt Chunk
+  async decryptChunk(fileKey, ctBase64, ivBase64) {
+    return window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: this.base64ToArrayBuffer(ivBase64), tagLength: 128 },
+      fileKey,
+      this.base64ToArrayBuffer(ctBase64)
+    );
+  }
+
+  // 4. Wrap File Key with Session Key
+  async wrapFileKey(sessionKey, fileKey) {
+    const rawFileKey = await window.crypto.subtle.exportKey('raw', fileKey);
+    const iv = this.generateMessageIV();
+    const ct = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, tagLength: 128 },
+      sessionKey,
+      rawFileKey
+    );
+    return btoa(JSON.stringify({
+      iv: this.arrayBufferToBase64(iv),
+      ct: this.arrayBufferToBase64(ct)
+    }));
+  }
+
+  // 5. Unwrap File Key
+  async unwrapFileKey(sessionKey, wrappedStr) {
+    const { iv, ct } = JSON.parse(atob(wrappedStr));
+    const rawKey = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: this.base64ToArrayBuffer(iv), tagLength: 128 },
+      sessionKey,
+      this.base64ToArrayBuffer(ct)
+    );
+    return window.crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  }
+
+  // Util
+  arrayBufferToBase64(buf) {
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+  base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  }
+  arrayBufferToHex(buf) {
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  
 }
 // Create singleton instance
 const cryptoUtils = new CryptoUtils();

@@ -5,7 +5,8 @@ import Register from './components/register';
 import KeyManager from './components/KeyManager';
 import KeyExchange from './components/KeyExchange';
 import Chat from './components/Chat';
-import { authService } from './services/auth';
+import FileShare from './components/FileShare';
+import { authService } from '../src/services/auth';
 import { authAPI } from './services/api';
 import './App.css';
 
@@ -69,6 +70,7 @@ function App() {
     setCurrentView('login');
   };
 
+  // ✅ This function is passed to FileShare and KeyExchange
   const openChat = (recipientId, sessionId) => {
     console.log('✅ Opening chat:', { recipientId, sessionId });
     setChatContext({ recipientId, sessionId });
@@ -119,7 +121,7 @@ function App() {
       <KeyExchange
         user={user}
         onBack={() => setCurrentView('dashboard')}
-        onStartChat={openChat}  // ✅ Pass the openChat function
+        onStartChat={openChat}
       />
     );
   }
@@ -138,28 +140,44 @@ function App() {
         <main className="app-main">
           <div className="dashboard-container">
             <div className="welcome-card">
-              <h2>🎉 Module 5: End-to-End Encrypted Messaging</h2>
+              <h2>🎉 Dashboard</h2>
 
               <div className="user-info">
-                <h3>User Information:</h3>
-                <p><strong>Username:</strong> {user.username}</p>
-                <p><strong>User ID:</strong> {user.id}</p>
                 <p><strong>Status:</strong> <span className="status-active">Active</span></p>
               </div>
 
-              <KeyManager />
-
-              <div className="next-module">
-                <h3>Ready to Chat!</h3>
-                <p>Complete key exchange with another user, then start secure messaging.</p>
-                <button
-                  onClick={() => setCurrentView('key-exchange')}
-                  className="auth-action-button"
-                  style={{ marginTop: '20px' }}
-                >
-                  🔐 Start Key Exchange
-                </button>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', justifyContent: 'center' }}>
+                 <button 
+                   onClick={() => document.getElementById('tab-keys').scrollIntoView({behavior: 'smooth'})}
+                   className="auth-action-button secondary"
+                 >
+                   Keys
+                 </button>
+                 <button 
+                   onClick={() => setCurrentView('key-exchange')}
+                   className="auth-action-button"
+                 >
+                   New Exchange
+                 </button>
+                 <button 
+                   onClick={() => document.getElementById('tab-files').scrollIntoView({behavior: 'smooth'})}
+                   className="auth-action-button secondary"
+                 >
+                   Files & Chat
+                 </button>
               </div>
+
+              <div id="tab-keys">
+                <KeyManager />
+              </div>
+
+              <hr style={{ margin: '30px 0', border: '0', borderTop: '1px solid #eee' }} />
+
+              <div id="tab-files">
+                {/* ✅ Passing openChat here */}
+                <FileShare onStartChat={openChat} />
+              </div>
+
             </div>
           </div>
         </main>
