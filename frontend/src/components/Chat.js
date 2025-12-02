@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import messageService from '../services/messageService';
 import { authService } from '../services/auth';
@@ -15,7 +14,36 @@ const Chat = ({ recipientId, sessionId, onBack }) => {
   const messagesEndRef = useRef(null);
   const currentUser = authService.getCurrentUser();
 
-  console.log('🔍 Chat component mounted:', { recipientId, sessionId, currentUserId: currentUser?.id });
+  // ✅ FIXED: Add comprehensive null checks
+  useEffect(() => {
+    // Validate props on mount
+    if (!recipientId) {
+      console.error('❌ Chat component: recipientId is missing');
+      setError('Invalid recipient. Please go back and select a user.');
+      return;
+    }
+
+    if (!sessionId) {
+      console.error('❌ Chat component: sessionId is missing');
+      setError('No secure session established. Please complete key exchange first.');
+      return;
+    }
+
+    if (!currentUser || !currentUser.id) {
+      console.error('❌ Chat component: currentUser is missing');
+      setError('Authentication error. Please log in again.');
+      return;
+    }
+
+    console.log('✅ Chat component mounted:', { recipientId, sessionId, currentUserId: currentUser.id });
+
+    // All validations passed, load data
+    loadRecipient();
+    loadMessages();
+
+    const interval = setInterval(loadMessages, 3000);
+    return () => clearInterval(interval);
+  }, [recipientId, sessionId]); // Re-run if these change
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -34,6 +62,11 @@ const Chat = ({ recipientId, sessionId, onBack }) => {
   };
 
   const loadMessages = async () => {
+    // Skip loading if required data is missing
+    if (!recipientId || !sessionId || !currentUser?.id) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -62,8 +95,20 @@ const Chat = ({ recipientId, sessionId, onBack }) => {
     e.preventDefault();
 
     if (!messageText.trim()) return;
+
+    // ✅ FIXED: Validate required data before sending
     if (!sessionId) {
       setError('No active session. Please complete key exchange first.');
+      return;
+    }
+
+    if (!recipientId) {
+      setError('No recipient selected.');
+      return;
+    }
+
+    if (!currentUser?.id) {
+      setError('Authentication error. Please log in again.');
       return;
     }
 
@@ -112,20 +157,6 @@ const Chat = ({ recipientId, sessionId, onBack }) => {
     }
   };
 
-  useEffect(() => {
-    if (!recipientId || !sessionId) {
-      console.error('❌ Missing recipientId or sessionId');
-      setError('Missing required parameters');
-      return;
-    }
-
-    loadRecipient();
-    loadMessages();
-
-    const interval = setInterval(loadMessages, 3000);
-    return () => clearInterval(interval);
-  }, [recipientId, sessionId]);
-
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -136,6 +167,26 @@ const Chat = ({ recipientId, sessionId, onBack }) => {
     if (diff < 86400000) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
+
+  // ✅ FIXED: Show error state if validation failed
+  if (error && !recipientId || !sessionId || !currentUser) {
+    return (
+      <div className="chat-container">
+        <div className="chat-header">
+          <button onClick={onBack} className="back-button">← Back</button>
+          <div className="chat-header-info">
+            <h3>Error</h3>
+          </div>
+        </div>
+        <div className="chat-error" style={{ margin: '20px', textAlign: 'center' }}>
+          <h3>⚠️ {error || 'Invalid chat session'}</h3>
+          <button onClick={onBack} className="btn btn-primary" style={{ marginTop: '20px' }}>
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="chat-container">

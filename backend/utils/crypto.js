@@ -5,32 +5,32 @@ class BackendCryptoUtils {
     this.ecdhCurve = 'prime256v1'; // P-256 curve
   }
 
-  // Verify RSA-PSS signature
-// Verify RSA-PSS signature
-verifySignature(publicKeyPem, signature, data) {
-  try {
-    // Node.js requires 'sha256' as the algorithm, not 'RSA-PSS'
-    // RSA-PSS is specified in the verify options
-    const verify = crypto.createVerify('sha256');
-    verify.update(data);
-    verify.end();
-    
-    const isValid = verify.verify(
-      {
-        key: publicKeyPem,
-        padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-        saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
-      },
-      signature,
-      'base64'
-    );
-    
-    return isValid;
-  } catch (error) {
-    console.error('Signature verification failed:', error);
-    return false;
+  // ✅ FIXED: Verify RSA-PSS signature
+  verifySignature(publicKeyPem, signature, data) {
+    try {
+      // Create verify object with SHA-256 (the hash algorithm used with RSA-PSS)
+      const verify = crypto.createVerify('sha256');
+      verify.update(data);
+      verify.end();
+      
+      // Verify with RSA-PSS padding options
+      const isValid = verify.verify(
+        {
+          key: publicKeyPem,
+          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+        },
+        signature,
+        'base64'
+      );
+      
+      return isValid;
+    } catch (error) {
+      console.error('Signature verification failed:', error);
+      return false;
+    }
   }
-}
+
   // Generate HMAC for key confirmation
   generateHMAC(key, data) {
     const hmac = crypto.createHmac('sha256', key);

@@ -25,7 +25,6 @@ class IndexedDBManager {
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         
-        // Create object store if it doesn't exist
         if (!db.objectStoreNames.contains(this.storeName)) {
           const store = db.createObjectStore(this.storeName, { keyPath: 'id' });
           store.createIndex('userId', 'userId', { unique: false });
@@ -36,7 +35,7 @@ class IndexedDBManager {
     });
   }
 
-  // Store private key securely (UPDATED)
+  // Store private key securely
   async storePrivateKey(userId, privateKeyData, keyInfo = {}, keyType = 'encryption') {
     try {
       if (!this.db) await this.init();
@@ -45,13 +44,11 @@ class IndexedDBManager {
       const store = transaction.objectStore(this.storeName);
 
       const keyRecord = {
-        // ID is now a composite of keyType and userId
         id: `${keyType}_${userId}`,
         userId: userId,
         keyType: keyType,
         keyData: privateKeyData,
         keyInfo: {
-          // Default algorithm based on keyType
           algorithm: keyInfo.algorithm || (keyType === 'encryption' ? 'RSA-OAEP' : 'RSA-PSS'),
           modulusLength: keyInfo.modulusLength || 2048,
           hash: keyInfo.hash || 'SHA-256',
@@ -70,7 +67,7 @@ class IndexedDBManager {
     }
   }
 
-  // Retrieve private key (UPDATED)
+  // Retrieve private key
   async getPrivateKey(userId, keyType = 'encryption') {
     try {
       if (!this.db) await this.init();
@@ -79,12 +76,10 @@ class IndexedDBManager {
       const store = transaction.objectStore(this.storeName);
       
       return new Promise((resolve, reject) => {
-        // Composite key ID for retrieval
         const request = store.get(`${keyType}_${userId}`);
         
         request.onsuccess = () => {
           if (request.result) {
-            // Update last accessed time
             this.updateLastAccessed(`${keyType}_${userId}`);
             console.log(`✅ ${keyType} private key retrieved from IndexedDB`);
             resolve(request.result);
@@ -103,7 +98,7 @@ class IndexedDBManager {
     }
   }
 
-  // Store session keys (for future use)
+  // Store session keys
   async storeSessionKey(userId, sessionId, keyData, keyInfo = {}) {
     try {
       if (!this.db) await this.init();
@@ -182,10 +177,9 @@ class IndexedDBManager {
     }
   }
 
-  // Check if private key exists for user (UPDATED)
+  // Check if private key exists for user
   async hasPrivateKey(userId, keyType = 'encryption') {
     try {
-      // Use the updated getPrivateKey which handles keyType
       const key = await this.getPrivateKey(userId, keyType);
       return key !== null;
     } catch (error) {
@@ -194,7 +188,7 @@ class IndexedDBManager {
     }
   }
 
-  // Get all keys for a user (for management)
+  // Get all keys for a user
   async getUserKeys(userId) {
     try {
       if (!this.db) await this.init();
@@ -228,7 +222,6 @@ class IndexedDBManager {
       const transaction = this.db.transaction([this.storeName], 'readwrite');
       const store = transaction.objectStore(this.storeName);
       
-      // Return a promise since store.delete is asynchronous
       return new Promise((resolve, reject) => {
         const request = store.delete(keyId);
         
@@ -249,23 +242,35 @@ class IndexedDBManager {
     }
   }
 
-  // Clear all keys for user (UPDATED)
-  async clearUserKeys(userId, keyType) {
+  // ✅ FIXED: Clear all keys for user with optional type filtering
+  /**
+   * Clear user keys from IndexedDB
+   * @param {string} userId - User ID
+   * @param {string} [keyType] - Optional: specific key type to delete ('encryption', 'signing', 'session')
+   *                             If omitted, deletes ALL keys for the user
+   * @returns {Promise<boolean>}
+   * 
+   * Examples:
+   * - clearUserKeys(userId) → Deletes ALL keys for user
+   * - clearUserKeys(userId, 'encryption') → Deletes only encryption keys
+   * - clearUserKeys(userId, 'signing') → Deletes only signing keys
+   */
+  async clearUserKeys(userId, keyType = null) {
     try {
-      // NOTE: This now correctly calls getUserKeys and deletes all found keys.
-      // If you intended to clear only a specific type, you would need to adjust this logic.
-      // Given the keyService calls this for both 'signing' and 'encryption' keys, 
-      // the keyService should be responsible for filtering. Let's keep this generic 
-      // to rely on the keyService.clearUserKeys logic.
-      
       const userKeys = await this.getUserKeys(userId);
+      
+      let deletedCount = 0;
       for (const key of userKeys) {
-        // If keyType is provided, only delete that type (e.g., used for key rotation logic)
-        if (!keyType || key.keyType === keyType) {
+        // If keyType is specified, only delete that type
+        // If keyType is null, delete all keys
+        if (keyType === null || key.keyType === keyType) {
           await this.deleteKey(key.id);
+          deletedCount++;
         }
       }
-      console.log(`✅ All ${keyType ? keyType + ' user ' : 'user'} keys cleared from IndexedDB`);
+      
+      const typeDesc = keyType ? `${keyType} ` : '';
+      console.log(`✅ Cleared ${deletedCount} ${typeDesc}key(s) for user ${userId}`);
       return true;
     } catch (error) {
       console.error('❌ Failed to clear user keys:', error);

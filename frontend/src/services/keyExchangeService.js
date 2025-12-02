@@ -125,12 +125,11 @@ class KeyExchangeService {
       const initiatorPublicKey = await cryptoUtils.importECDHPublicKey(session.initiatorEphemeralPublic);
       const sharedSecret = await cryptoUtils.computeECDHSharedSecret(ecdhKeyPair.privateKey, initiatorPublicKey);
 
-      // FIX: Properly combine nonces for salt
-      // Decode base64 nonces to ArrayBuffers first
+      // ✅ FIXED: Properly combine nonces in CONSISTENT order
+      // CRITICAL: Both sides MUST use: initiatorNonce || responderNonce
       const initiatorNonceBuffer = cryptoUtils.base64ToArrayBuffer(session.initiatorNonce);
       const responderNonceBuffer = cryptoUtils.base64ToArrayBuffer(nonce);
 
-      // Concatenate the two ArrayBuffers
       const combinedNonces = new Uint8Array(initiatorNonceBuffer.byteLength + responderNonceBuffer.byteLength);
       combinedNonces.set(new Uint8Array(initiatorNonceBuffer), 0);
       combinedNonces.set(new Uint8Array(responderNonceBuffer), initiatorNonceBuffer.byteLength);
@@ -167,165 +166,178 @@ class KeyExchangeService {
       throw error;
     }
   }
+
   // Complete key exchange (for initiator)
-// Complete key exchange (for initiator)
-async completeKeyExchange(sessionId, myUserId) {
-  try {
-    console.log('🏁 Completing key exchange:', sessionId);
+  async completeKeyExchange(sessionId, myUserId) {
+    try {
+      console.log('🏁 Completing key exchange:', sessionId);
 
-    const sessionData = this.activeSessions.get(sessionId);
-    if (!sessionData) {
-      throw new Error('Session not found');
-    }
-
-    // Step 1: Get session data from server
-    const sessionResponse = await keyExchangeAPI.getSession(sessionId);
-    const session = sessionResponse.data.session;
-
-    // Step 2: Compute shared secret and session key
-    console.log('🔐 Computing shared secret...');
-    const responderPublicKey = await cryptoUtils.importECDHPublicKey(session.responderEphemeralPublic);
-    const sharedSecret = await cryptoUtils.computeECDHSharedSecret(sessionData.myECDHKeyPair.privateKey, responderPublicKey);
-
-    // FIX: Properly combine nonces for salt
-    const initiatorNonceBuffer = cryptoUtils.base64ToArrayBuffer(sessionData.myNonce);
-    const responderNonceBuffer = cryptoUtils.base64ToArrayBuffer(session.responderNonce);
-    
-    // Concatenate the two ArrayBuffers
-    const combinedNonces = new Uint8Array(initiatorNonceBuffer.byteLength + responderNonceBuffer.byteLength);
-    combinedNonces.set(new Uint8Array(initiatorNonceBuffer), 0);
-    combinedNonces.set(new Uint8Array(responderNonceBuffer), initiatorNonceBuffer.byteLength);
-    
-    const salt = combinedNonces.buffer;
-    const info = new TextEncoder().encode('secure-messaging-session-key');
-    const sessionKey = await cryptoUtils.deriveSessionKey(sharedSecret, salt, info);
-
-    // Step 3: Generate key confirmation
-    console.log('🔐 Generating key confirmation...');
-    const confirmationData = JSON.stringify({
-      sessionId,
-      sharedSecret: cryptoUtils.arrayBufferToBase64(sharedSecret)
-    });
-    console.log('Shared secret before HMAC:', sharedSecret);
-
-    const confirmation = await cryptoUtils.generateHMAC(sharedSecret, confirmationData);
-
-    // Step 4: Send confirmation
-    console.log('📡 Sending key confirmation...');
-    await keyExchangeAPI.confirm({
-      sessionId,
-      confirmation,
-      isInitiator: true
-    });
-
-    // Step 5: Update local session data
-    sessionData.sharedSecret = sharedSecret;
-    sessionData.sessionKey = sessionKey;
-    sessionData.status = 'confirmed';
-    this.activeSessions.set(sessionId, sessionData);
-
-    // Step 6: Store session key for future use
-    const sessionKeyBase64 = await cryptoUtils.exportSessionKey(sessionKey);
-    await indexedDBManager.storeSessionKey(
-      myUserId,
-      sessionId,
-      sessionKeyBase64,
-      {
-        algorithm: 'AES-GCM',
-        keyLength: 256,
-        derivedAt: new Date().toISOString()
+      const sessionData = this.activeSessions.get(sessionId);
+      if (!sessionData) {
+        throw new Error('Session not found');
       }
-    );
 
-    console.log('✅ Key exchange completed successfully');
-    return {
-      success: true,
-      sessionId,
-      sessionKey
-    };
+      // Step 1: Get session data from server
+      const sessionResponse = await keyExchangeAPI.getSession(sessionId);
+      const session = sessionResponse.data.session;
 
-  } catch (error) {
-    console.error('❌ Key exchange completion failed:', error);
-    throw error;
+      // Step 2: Compute shared secret and session key
+      console.log('🔐 Computing shared secret...');
+      const responderPublicKey = await cryptoUtils.importECDHPublicKey(session.responderEphemeralPublic);
+      const sharedSecret = await cryptoUtils.computeECDHSharedSecret(sessionData.myECDHKeyPair.privateKey, responderPublicKey);
+
+      // ✅ FIXED: Same nonce concatenation order as responder
+      // CRITICAL: initiatorNonce || responderNonce
+      const initiatorNonceBuffer = cryptoUtils.base64ToArrayBuffer(sessionData.myNonce);
+      const responderNonceBuffer = cryptoUtils.base64ToArrayBuffer(session.responderNonce);
+      
+      const combinedNonces = new Uint8Array(initiatorNonceBuffer.byteLength + responderNonceBuffer.byteLength);
+      combinedNonces.set(new Uint8Array(initiatorNonceBuffer), 0);
+      combinedNonces.set(new Uint8Array(responderNonceBuffer), initiatorNonceBuffer.byteLength);
+      
+      const salt = combinedNonces.buffer;
+      const info = new TextEncoder().encode('secure-messaging-session-key');
+      const sessionKey = await cryptoUtils.deriveSessionKey(sharedSecret, salt, info);
+
+      // ✅ FIXED: Generate key confirmation with CONSISTENT format
+      console.log('🔐 Generating key confirmation...');
+      const confirmationData = JSON.stringify({
+        sessionId,
+        role: 'initiator',
+        sharedSecretHash: cryptoUtils.arrayBufferToBase64(
+          await crypto.subtle.digest('SHA-256', sharedSecret)
+        )
+      });
+
+      const confirmation = await cryptoUtils.generateHMAC(sharedSecret, confirmationData);
+
+      // Step 4: Send confirmation
+      console.log('📡 Sending key confirmation...');
+      await keyExchangeAPI.confirm({
+        sessionId,
+        confirmation,
+        isInitiator: true
+      });
+
+      // Step 5: Update local session data
+      sessionData.sharedSecret = sharedSecret;
+      sessionData.sessionKey = sessionKey;
+      sessionData.status = 'confirmed';
+      this.activeSessions.set(sessionId, sessionData);
+
+      // Step 6: Store session key for future use
+      const sessionKeyBase64 = await cryptoUtils.exportSessionKey(sessionKey);
+      await indexedDBManager.storeSessionKey(
+        myUserId,
+        sessionId,
+        sessionKeyBase64,
+        {
+          algorithm: 'AES-GCM',
+          keyLength: 256,
+          derivedAt: new Date().toISOString()
+        }
+      );
+
+      console.log('✅ Key exchange completed successfully');
+      return {
+        success: true,
+        sessionId,
+        sessionKey
+      };
+
+    } catch (error) {
+      console.error('❌ Key exchange completion failed:', error);
+      throw error;
+    }
   }
-}
 
   // Verify key confirmation (for responder)
-// Verify key confirmation (for responder)
-async verifyKeyConfirmation(sessionId, myUserId) {
-  try {
-    console.log('🔍 Verifying key confirmation:', sessionId);
+  async verifyKeyConfirmation(sessionId, myUserId) {
+    try {
+      console.log('🔍 Verifying key confirmation:', sessionId);
 
-    const sessionData = this.activeSessions.get(sessionId);
-    if (!sessionData) {
-      throw new Error('Session not found');
-    }
-
-    // Step 1: Get session data from server
-    const sessionResponse = await keyExchangeAPI.getSession(sessionId);
-    const session = sessionResponse.data.session;
-
-    // Step 2: Check if initiator's confirmation is ready
-    if (!session.initiatorConfirmation) {
-      throw new Error('Initiator confirmation not received');
-    }
-
-    console.log('✅ Initiator confirmation received');
-
-    // Step 3: Generate expected confirmation for comparison
-    const confirmationData = JSON.stringify({
-      sessionId,
-      sharedSecret: cryptoUtils.arrayBufferToBase64(sessionData.sharedSecret)
-    });
-
-    const expectedConfirmation = await cryptoUtils.generateHMAC(sessionData.sharedSecret, confirmationData);
-
-    // Step 4: Verify confirmation matches
-    if (session.initiatorConfirmation !== expectedConfirmation) {
-      console.error('❌ MITM ATTACK DETECTED! Confirmation mismatch!');
-      throw new Error('Key confirmation mismatch - possible MITM attack!');
-    }
-
-    console.log('✅ Confirmation verified successfully');
-
-    // Step 5: Send our confirmation
-    console.log('📡 Sending responder confirmation...');
-    const ourConfirmation = await cryptoUtils.generateHMAC(sessionData.sharedSecret, 'responder-confirmation');
-    await keyExchangeAPI.confirm({
-      sessionId,
-      confirmation: ourConfirmation,
-      isInitiator: false
-    });
-
-    // Step 6: Update local session data
-    sessionData.status = 'completed';
-    this.activeSessions.set(sessionId, sessionData);
-
-    // Step 7: Store session key for future use
-    const sessionKeyBase64 = await cryptoUtils.exportSessionKey(sessionData.sessionKey);
-    await indexedDBManager.storeSessionKey(
-      myUserId,
-      sessionId,
-      sessionKeyBase64,
-      {
-        algorithm: 'AES-GCM',
-        keyLength: 256,
-        derivedAt: new Date().toISOString()
+      const sessionData = this.activeSessions.get(sessionId);
+      if (!sessionData) {
+        throw new Error('Session not found');
       }
-    );
 
-    console.log('✅ Key confirmation verified and exchange completed');
-    return {
-      success: true,
-      sessionId,
-      sessionKey: sessionData.sessionKey
-    };
+      // Step 1: Get session data from server
+      const sessionResponse = await keyExchangeAPI.getSession(sessionId);
+      const session = sessionResponse.data.session;
 
-  } catch (error) {
-    console.error('❌ Key confirmation verification failed:', error);
-    throw error;
+      // Step 2: Check if initiator's confirmation is ready
+      if (!session.initiatorConfirmation) {
+        throw new Error('Initiator confirmation not received');
+      }
+
+      console.log('✅ Initiator confirmation received');
+
+      // ✅ FIXED: Generate expected confirmation with SAME format
+      const confirmationData = JSON.stringify({
+        sessionId,
+        role: 'initiator',
+        sharedSecretHash: cryptoUtils.arrayBufferToBase64(
+          await crypto.subtle.digest('SHA-256', sessionData.sharedSecret)
+        )
+      });
+
+      const expectedConfirmation = await cryptoUtils.generateHMAC(sessionData.sharedSecret, confirmationData);
+
+      // Step 4: Verify confirmation matches
+      if (session.initiatorConfirmation !== expectedConfirmation) {
+        console.error('❌ MITM ATTACK DETECTED! Confirmation mismatch!');
+        throw new Error('Key confirmation mismatch - possible MITM attack!');
+      }
+
+      console.log('✅ Confirmation verified successfully');
+
+      // ✅ FIXED: Send our confirmation with CONSISTENT format
+      console.log('📡 Sending responder confirmation...');
+      const ourConfirmationData = JSON.stringify({
+        sessionId,
+        role: 'responder',
+        sharedSecretHash: cryptoUtils.arrayBufferToBase64(
+          await crypto.subtle.digest('SHA-256', sessionData.sharedSecret)
+        )
+      });
+      
+      const ourConfirmation = await cryptoUtils.generateHMAC(sessionData.sharedSecret, ourConfirmationData);
+      
+      await keyExchangeAPI.confirm({
+        sessionId,
+        confirmation: ourConfirmation,
+        isInitiator: false
+      });
+
+      // Step 6: Update local session data
+      sessionData.status = 'completed';
+      this.activeSessions.set(sessionId, sessionData);
+
+      // Step 7: Store session key for future use
+      const sessionKeyBase64 = await cryptoUtils.exportSessionKey(sessionData.sessionKey);
+      await indexedDBManager.storeSessionKey(
+        myUserId,
+        sessionId,
+        sessionKeyBase64,
+        {
+          algorithm: 'AES-GCM',
+          keyLength: 256,
+          derivedAt: new Date().toISOString()
+        }
+      );
+
+      console.log('✅ Key confirmation verified and exchange completed');
+      return {
+        success: true,
+        sessionId,
+        sessionKey: sessionData.sessionKey
+      };
+
+    } catch (error) {
+      console.error('❌ Key confirmation verification failed:', error);
+      throw error;
+    }
   }
-}
 
   // Get active session
   getSession(sessionId) {
