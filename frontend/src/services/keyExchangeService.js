@@ -125,8 +125,8 @@ class KeyExchangeService {
       const initiatorPublicKey = await cryptoUtils.importECDHPublicKey(session.initiatorEphemeralPublic);
       const sharedSecret = await cryptoUtils.computeECDHSharedSecret(ecdhKeyPair.privateKey, initiatorPublicKey);
 
-      // ✅ FIXED: Properly combine nonces in CONSISTENT order
-      // CRITICAL: Both sides MUST use: initiatorNonce || responderNonce
+      // ✅ FIXED: CRITICAL - Consistent nonce concatenation order
+      // MUST BE: initiatorNonce || responderNonce (both sides use this)
       const initiatorNonceBuffer = cryptoUtils.base64ToArrayBuffer(session.initiatorNonce);
       const responderNonceBuffer = cryptoUtils.base64ToArrayBuffer(nonce);
 
@@ -158,6 +158,7 @@ class KeyExchangeService {
         success: true,
         sessionId,
         sessionData,
+        sessionKey,
         initiatorPublicKey: response.data.initiatorPublicKey
       };
 
@@ -186,8 +187,8 @@ class KeyExchangeService {
       const responderPublicKey = await cryptoUtils.importECDHPublicKey(session.responderEphemeralPublic);
       const sharedSecret = await cryptoUtils.computeECDHSharedSecret(sessionData.myECDHKeyPair.privateKey, responderPublicKey);
 
-      // ✅ FIXED: Same nonce concatenation order as responder
-      // CRITICAL: initiatorNonce || responderNonce
+      // ✅ FIXED: CRITICAL - Same nonce concatenation order as responder
+      // MUST BE: initiatorNonce || responderNonce
       const initiatorNonceBuffer = cryptoUtils.base64ToArrayBuffer(sessionData.myNonce);
       const responderNonceBuffer = cryptoUtils.base64ToArrayBuffer(session.responderNonce);
       
@@ -201,14 +202,11 @@ class KeyExchangeService {
 
       // ✅ FIXED: Generate key confirmation with CONSISTENT format
       console.log('🔐 Generating key confirmation...');
-      const confirmationData = JSON.stringify({
-        sessionId,
-        role: 'initiator',
-        sharedSecretHash: cryptoUtils.arrayBufferToBase64(
-          await crypto.subtle.digest('SHA-256', sharedSecret)
-        )
-      });
-
+      const sharedSecretHash = cryptoUtils.arrayBufferToBase64(
+        await crypto.subtle.digest('SHA-256', sharedSecret)
+      );
+      
+      const confirmationData = `${sessionId}|initiator|${sharedSecretHash}`;
       const confirmation = await cryptoUtils.generateHMAC(sharedSecret, confirmationData);
 
       // Step 4: Send confirmation
@@ -273,19 +271,18 @@ class KeyExchangeService {
       console.log('✅ Initiator confirmation received');
 
       // ✅ FIXED: Generate expected confirmation with SAME format
-      const confirmationData = JSON.stringify({
-        sessionId,
-        role: 'initiator',
-        sharedSecretHash: cryptoUtils.arrayBufferToBase64(
-          await crypto.subtle.digest('SHA-256', sessionData.sharedSecret)
-        )
-      });
-
+      const sharedSecretHash = cryptoUtils.arrayBufferToBase64(
+        await crypto.subtle.digest('SHA-256', sessionData.sharedSecret)
+      );
+      
+      const confirmationData = `${sessionId}|initiator|${sharedSecretHash}`;
       const expectedConfirmation = await cryptoUtils.generateHMAC(sessionData.sharedSecret, confirmationData);
 
       // Step 4: Verify confirmation matches
       if (session.initiatorConfirmation !== expectedConfirmation) {
         console.error('❌ MITM ATTACK DETECTED! Confirmation mismatch!');
+        console.error('Expected:', expectedConfirmation);
+        console.error('Received:', session.initiatorConfirmation);
         throw new Error('Key confirmation mismatch - possible MITM attack!');
       }
 
@@ -293,14 +290,7 @@ class KeyExchangeService {
 
       // ✅ FIXED: Send our confirmation with CONSISTENT format
       console.log('📡 Sending responder confirmation...');
-      const ourConfirmationData = JSON.stringify({
-        sessionId,
-        role: 'responder',
-        sharedSecretHash: cryptoUtils.arrayBufferToBase64(
-          await crypto.subtle.digest('SHA-256', sessionData.sharedSecret)
-        )
-      });
-      
+      const ourConfirmationData = `${sessionId}|responder|${sharedSecretHash}`;
       const ourConfirmation = await cryptoUtils.generateHMAC(sessionData.sharedSecret, ourConfirmationData);
       
       await keyExchangeAPI.confirm({

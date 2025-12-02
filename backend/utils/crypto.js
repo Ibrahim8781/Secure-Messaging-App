@@ -5,23 +5,25 @@ class BackendCryptoUtils {
     this.ecdhCurve = 'prime256v1'; // P-256 curve
   }
 
-  // ✅ FIXED: Verify RSA-PSS signature
+  // ✅ FIXED: Proper RSA-PSS signature verification
   verifySignature(publicKeyPem, signature, data) {
     try {
-      // Create verify object with SHA-256 (the hash algorithm used with RSA-PSS)
-      const verify = crypto.createVerify('sha256');
-      verify.update(data);
-      verify.end();
+      // Convert base64 signature to Buffer
+      const signatureBuffer = Buffer.from(signature, 'base64');
       
-      // Verify with RSA-PSS padding options
-      const isValid = verify.verify(
+      // Convert data string to Buffer
+      const dataBuffer = Buffer.from(data, 'utf8');
+      
+      // Verify with RSA-PSS padding
+      const isValid = crypto.verify(
+        'sha256',
+        dataBuffer,
         {
           key: publicKeyPem,
           padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+          saltLength: 32 // Must match frontend (32 bytes)
         },
-        signature,
-        'base64'
+        signatureBuffer
       );
       
       return isValid;
