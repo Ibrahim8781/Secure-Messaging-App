@@ -1,158 +1,142 @@
-/* Add to existing App.css */
-
 /* Loading container */
 .loading-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 50vh;
-  gap: 1rem;
+  min-height: 100vh;
+  gap: 1.5rem;
+  color: white;
+  backdrop-filter: blur(10px);
+}
+
+/* App Header */
+.app-header {
+  background: var(--surface-color);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-md);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+.app-header p {
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin: 0;
 }
 
 /* Dashboard styles */
+.app-main {
+  padding: 2rem 1rem;
+}
+
 .dashboard-container {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
 .welcome-card {
-  background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: var(--surface-color);
+  padding: 2.5rem;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
   margin-bottom: 2rem;
+  transition: transform 0.2s ease;
 }
 
 .welcome-card h2 {
-  color: #27ae60;
-  margin-bottom: 1rem;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
   text-align: center;
+  color: #1f2937;
 }
 
 .user-info {
-  background: #f8f9fa;
+  background: #f8fafc;
   padding: 1.5rem;
-  border-radius: 8px;
-  margin: 1.5rem 0;
-  border-left: 4px solid #3498db;
-}
-
-.user-info h3 {
-  color: #2c3e50;
-  margin-bottom: 1rem;
-}
-
-.user-info p {
-  margin: 0.5rem 0;
-  color: #7f8c8d;
+  border-radius: 12px;
+  margin: 2rem 0;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: center;
 }
 
 .status-active {
-  color: #27ae60;
-  font-weight: bold;
-}
-
-.next-module {
-  background: #e8f4fd;
-  padding: 1.5rem;
-  border-radius: 8px;
-  border: 1px solid #b3d9ff;
-}
-
-.next-module h3 {
-  color: #2c3e50;
-  margin-bottom: 1rem;
-}
-
-.feature-preview {
-  margin-top: 1rem;
-}
-
-.feature-preview h4 {
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-}
-
-.feature-preview ul {
-  list-style: none;
-  padding: 0;
-}
-
-.feature-preview li {
-  padding: 0.25rem 0;
-  color: #27ae60;
-}
-
-.feature-preview li:before {
-  content: "🔄 ";
+  color: #10b981;
+  font-weight: 700;
+  background: #ecfdf5;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
 }
 
 /* Auth action buttons */
 .auth-action-button {
-  background: linear-gradient(135deg, #3498db, #2980b9);
+  background: var(--primary-gradient);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 5px;
+  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
   margin: 0 0.5rem;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
 }
 
 .auth-action-button:hover {
-  background: linear-gradient(135deg, #2980b9, #2471a3);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
 }
 
 .auth-action-button.secondary {
-  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  background: white;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  box-shadow: var(--shadow-sm);
 }
 
 .auth-action-button.secondary:hover {
-  background: linear-gradient(135deg, #7f8c8d, #717d7e);
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #1f2937;
 }
 
 /* Logout button */
 .logout-button {
-  background: #e74c3c;
+  background: #ef4444;
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 5px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: background 0.3s ease;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .logout-button:hover {
-  background: #c0392b;
+  background: #dc2626;
+  transform: scale(1.05);
 }
 
-/* Module features list */
-.module-features {
-  background: #f8f9fa;
-  padding: 1rem;
-  border-radius: 5px;
-  margin-top: 1rem;
-}
-
-.module-features h4 {
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-}
-
-.module-features ul {
-  list-style: none;
-  padding: 0;
-}
-
-.module-features li {
-  padding: 0.25rem 0;
-  color: #27ae60;
-}
-
-.module-features li:before {
-  content: "✅ ";
+hr {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+  margin: 2rem 0;
 }

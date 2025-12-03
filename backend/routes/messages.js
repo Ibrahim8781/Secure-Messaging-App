@@ -6,7 +6,7 @@ const authMiddleware = require('../middleware/auth');
 const backendCrypto = require('../utils/crypto');
 
 const MAX_MESSAGE_SIZE = 256 * 1024; // 256 KiB
-
+console.log("✅ LOADED: messages.js with POST route");
 // ✅ POST Route: Send encrypted message
 router.post('/', authMiddleware, async (req, res) => {
   try {
