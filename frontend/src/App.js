@@ -7,6 +7,7 @@ import KeyExchange from './components/KeyExchange';
 import Chat from './components/Chat';
 import FileShare from './components/FileShare';
 import { authService } from '../src/services/auth';
+import SecurityLogs from './components/SecurityLogs';
 import { authAPI } from './services/api';
 import './App.css';
 
@@ -147,24 +148,30 @@ function App() {
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', justifyContent: 'center' }}>
-                 <button 
-                   onClick={() => document.getElementById('tab-keys').scrollIntoView({behavior: 'smooth'})}
-                   className="auth-action-button secondary"
-                 >
-                   Keys
-                 </button>
-                 <button 
-                   onClick={() => setCurrentView('key-exchange')}
-                   className="auth-action-button"
-                 >
-                   New Exchange
-                 </button>
-                 <button 
-                   onClick={() => document.getElementById('tab-files').scrollIntoView({behavior: 'smooth'})}
-                   className="auth-action-button secondary"
-                 >
-                   Files & Chat
-                 </button>
+                <button
+                  onClick={() => document.getElementById('tab-keys').scrollIntoView({ behavior: 'smooth' })}
+                  className="auth-action-button secondary"
+                >
+                  Keys
+                </button>
+                <button
+                  onClick={() => setCurrentView('key-exchange')}
+                  className="auth-action-button"
+                >
+                  New Exchange
+                </button>
+                <button
+                  onClick={() => document.getElementById('tab-files').scrollIntoView({ behavior: 'smooth' })}
+                  className="auth-action-button secondary"
+                >
+                  Files & Chat
+                </button>
+                <button
+                  onClick={() => document.getElementById('tab-logs').scrollIntoView({ behavior: 'smooth' })}
+                  className="auth-action-button secondary"
+                >
+                  Audit Logs
+                </button>
               </div>
 
               <div id="tab-keys">
@@ -176,6 +183,12 @@ function App() {
               <div id="tab-files">
                 {/* ✅ Passing openChat here */}
                 <FileShare onStartChat={openChat} />
+              </div>
+
+              <hr style={{ margin: '30px 0', border: '0', borderTop: '1px solid #eee' }} />
+
+              <div id="tab-logs">
+                <SecurityLogs />
               </div>
 
             </div>

@@ -411,5 +411,70 @@ router.get('/exchange/pending', authMiddleware, async (req, res) => {
     });
   }
 });
+// =========================================================
+// VULNERABLE ROUTES (FOR DEMO ONLY - COPY THIS EXACTLY)
+// =========================================================
 
+// Vulnerable Initiate (No Signature Check)
+router.post('/exchange/initiate-vulnerable', authMiddleware, async (req, res) => {
+  try {
+    const { responderId, ephemeralPublic, nonce, timestamp } = req.body; 
+    const initiatorId = req.user._id;
+
+    // Create session ID with VULN tag
+    const sessionId = `${initiatorId}_${responderId}_${Date.now()}_VULN`;
+
+    // Create key exchange record WITHOUT verifying signature
+    const KeyExchange = require('../models/KeyExchange'); // Ensure model is imported
+    const keyExchange = new KeyExchange({
+      sessionId,
+      initiatorId,
+      responderId,
+      initiatorEphemeralPublic: ephemeralPublic,
+      initiatorNonce: nonce,
+      initiatorSignature: "skipped_for_demo", 
+      status: 'initiated'
+    });
+
+    await keyExchange.save();
+
+    res.status(201).json({
+      message: 'VULNERABLE Exchange initiated',
+      sessionId,
+      code: 'EXCHANGE_INITIATED'
+    });
+  } catch (error) {
+    console.error("Vuln Init Error:", error);
+    res.status(500).json({ error: 'Vulnerable init failed' });
+  }
+});
+
+// Vulnerable Respond (No Signature Check)
+router.post('/exchange/respond-vulnerable', authMiddleware, async (req, res) => {
+  try {
+    const { sessionId, ephemeralPublic, nonce } = req.body;
+    const KeyExchange = require('../models/KeyExchange'); // Ensure model is imported
+    
+    const session = await KeyExchange.findOne({ sessionId });
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    // Update session WITHOUT verifying signature
+    session.responderEphemeralPublic = ephemeralPublic;
+    session.responderNonce = nonce;
+    session.responderSignature = "skipped_for_demo";
+    session.status = 'responded';
+    await session.save();
+
+    res.json({
+      message: 'VULNERABLE Response recorded',
+      sessionId,
+      // In a real attack, the attacker would capture the initiator's key here
+      initiatorPublicKey: session.initiatorEphemeralPublic, 
+      code: 'RESPONSE_RECORDED'
+    });
+  } catch (error) {
+    console.error("Vuln Respond Error:", error);
+    res.status(500).json({ error: 'Vulnerable respond failed' });
+  }
+});
 module.exports = router;

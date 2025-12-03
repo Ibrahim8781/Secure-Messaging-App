@@ -68,18 +68,29 @@ class BackendCryptoUtils {
   }
 
   // Log security event
-  logSecurityEvent(eventType, sessionId, userId, details) {
-    const timestamp = new Date().toISOString();
-    console.log(`[SECURITY][${timestamp}] ${eventType} - Session: ${sessionId}, User: ${userId}`, details);
-    
-    // In Module 9, this will be stored in MongoDB
-    return {
-      eventType,
-      sessionId,
-      userId,
-      timestamp,
-      details
-    };
+// Log security event to MongoDB
+  async logSecurityEvent(eventType, sessionId, userId, details, req = null) {
+    try {
+      const SecurityLog = require('../models/SecurityLog'); // Lazy load to avoid circular deps
+      const timestamp = new Date().toISOString();
+      
+      // Console log for immediate debug
+      console.log(`[SECURITY][${timestamp}] ${eventType}`, details);
+
+      // Save to Database
+      const logEntry = new SecurityLog({
+        eventType,
+        sessionId,
+        userId,
+        details,
+        ipAddress: req ? (req.ip || req.connection.remoteAddress) : 'internal'
+      });
+
+      await logEntry.save();
+      return logEntry;
+    } catch (error) {
+      console.error('Failed to save security log:', error);
+    }
   }
 }
 
